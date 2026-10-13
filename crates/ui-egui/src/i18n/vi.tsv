@@ -680,6 +680,7 @@
 	Join the ArtCraft Discord…	Tham gia Discord ArtCraft…
 	Layer Comps	Tổ hợp lớp
 	Lock Workspace	Khóa không gian làm việc
+	Open Panels Floating	Mở bảng ở dạng nổi
 	Match All	Đồng bộ tất cả
 	Match Location	Đồng bộ vị trí
 	Match Rotation	Đồng bộ góc xoay
@@ -3717,3 +3718,9 @@ curves	Smooth	Làm mượt
 	Increase Brush Size	Tăng kích thước cọ
 	Decrease Brush Hardness	Giảm độ cứng của cọ
 	Increase Brush Hardness	Tăng độ cứng của cọ
+	Move to Separate Window	Chuyển sang cửa sổ riêng
+	Return to PhotoCraft Window	Trả về cửa sổ PhotoCraft
+	Dock Panel Group	Neo nhóm bảng
+	Dock to Icon Bar	Neo vào thanh biểu tượng
+	Remove from Icon Bar	Gỡ khỏi thanh biểu tượng
+	Move Icon	Di chuyển biểu tượng

@@ -1484,6 +1484,7 @@
 	Reset All Tools	Сбросить все инструменты
 	Reset all tools to their default settings?	Сбросить все инструменты к настройкам по умолчанию?
 	Lock Workspace	Заблокировать рабочую среду
+	Open Panels Floating	Открывать панели плавающими
 	Photography	Фотография
 	Graphic and web	Графика и web
 	Painting	Живопись
@@ -3203,3 +3204,9 @@ curves	Smooth	Сгладить
 	Increase Brush Size	Увеличить размер кисти
 	Decrease Brush Hardness	Уменьшить жёсткость кисти
 	Increase Brush Hardness	Увеличить жёсткость кисти
+	Move to Separate Window	Переместить в отдельное окно
+	Return to PhotoCraft Window	Вернуть в окно PhotoCraft
+	Dock Panel Group	Закрепить группу панелей
+	Dock to Icon Bar	Закрепить на панели значков
+	Remove from Icon Bar	Убрать с панели значков
+	Move Icon	Переместить значок

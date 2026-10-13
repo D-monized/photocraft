@@ -643,6 +643,7 @@
 	Lock Guides	Segédvonalak zárolása
 	Lock Slices	Szeletek zárolása
 	Lock Workspace	Munkaterület zárolása
+	Open Panels Floating	Panelek megnyitása lebegő ablakként
 	Make Selection…	Kijelölés készítése…
 	Make Symmetry Path	Szimmetriaútvonal készítése
 	Make Work Path…	Munkaútvonal készítése…
@@ -4149,3 +4150,9 @@ cameraRaw	Yellow	Sárga
 	Increase Brush Size	Ecsetméret növelése
 	Decrease Brush Hardness	Ecsetkeménység csökkentése
 	Increase Brush Hardness	Ecsetkeménység növelése
+	Move to Separate Window	Áthelyezés külön ablakba
+	Return to PhotoCraft Window	Vissza a PhotoCraft ablakába
+	Dock Panel Group	Panelcsoport dokkolása
+	Dock to Icon Bar	Dokkolás az ikonsávra
+	Remove from Icon Bar	Eltávolítás az ikonsávról
+	Move Icon	Ikon áthelyezése
