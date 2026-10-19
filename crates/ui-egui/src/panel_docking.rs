@@ -244,6 +244,9 @@ fn window_command(app: &mut PhotocraftApp, detach: bool, params: &Value) -> Resu
             change(app, "float", &json!({"panel": panel}))?;
         }
     }
+    if rect.is_some_and(|r| r[2] > MAX_WINDOW_SIZE || r[3] > MAX_WINDOW_SIZE) {
+        return Err(format!("width and height must be at most {MAX_WINDOW_SIZE}"));
+    }
     let members = app.ui.docking.as_ref().map(|layout| group_members(layout, panel)).filter(|m| !m.is_empty()).unwrap_or_else(|| vec![panel.to_owned()]);
     // One entry per window, under the panel it was opened by.
     app.ui.docking_windows.retain(|id, _| id != panel && !members.contains(id));
@@ -366,7 +369,15 @@ pub(crate) enum RailItem {
 
 /// An icon dragged within the bar moves among the others in its section: a line shows where it
 /// will land, and letting go puts it there. `groups` and `panels` are the icons as drawn.
-pub(crate) fn rail_reorder(app: &mut PhotocraftApp, ctx: &egui::Context, item: &RailItem, released: bool, groups: &[(Group, egui::Rect)], panels: &[(String, egui::Rect)], rail: egui::Rect) {
+pub(crate) fn rail_reorder(
+    app: &mut PhotocraftApp,
+    ctx: &egui::Context,
+    item: &RailItem,
+    released: bool,
+    groups: &[(Group, egui::Rect)],
+    panels: &[(String, egui::Rect)],
+    rail: egui::Rect,
+) {
     let Some(pointer) = ctx.pointer_interact_pos().or_else(|| ctx.input(|i| i.pointer.latest_pos())) else { return };
     if !rail.contains(pointer) || app.session.prefs().workspace_locked {
         return;
@@ -456,7 +467,8 @@ fn rail_window_item(app: &mut PhotocraftApp, id: &str, params: &Value) -> Option
 /// rail's built-in button for the group steps aside rather than show it twice.
 pub(crate) fn rail_replaces(app: &PhotocraftApp, group: Group) -> bool {
     app.ui.docking.as_ref().is_some_and(|layout| {
-        !PANELS.iter().any(|p| p.2 == group && layout.contains(&p.0.to_owned())) && PANELS.iter().any(|p| p.2 == group && app.ui.rail_panels.iter().any(|r| r == p.0))
+        !PANELS.iter().any(|p| p.2 == group && layout.contains(&p.0.to_owned()))
+            && PANELS.iter().any(|p| p.2 == group && app.ui.rail_panels.iter().any(|r| r == p.0))
     })
 }
 
@@ -564,46 +576,46 @@ pub(crate) fn rail_flyout(app: &mut PhotocraftApp, ctx: &egui::Context, rail: eg
     let locked = app.session.prefs().workspace_locked;
     let mut request: Option<&'static str> = None;
     let mut grip = None;
-    let shown = egui::Area::new(egui::Id::new("photocraft-rail-flyout"))
-        .order(egui::Order::Middle)
-        .fixed_pos(egui::pos2(left, top))
-        .constrain(true)
-        .show(ctx, |ui| {
-            egui::Frame::NONE.fill(t.card).stroke(egui::Stroke::new(1.0, t.card_border)).corner_radius(t.radius_sm).shadow(ui.visuals().popup_shadow).show(ui, |ui| {
-                ui.set_width(size.x);
-                ui.set_height(size.y);
-                // The title bar tears the panel off the bar into a floating window. Its buttons,
-                // drawn after, keep their clicks.
-                let bar = egui::Rect::from_min_size(ui.cursor().min, egui::vec2(size.x, 28.0));
-                grip = Some(ui.interact(bar, egui::Id::new("photocraft-rail-flyout-grip"), egui::Sense::drag()).on_hover_cursor(egui::CursorIcon::Grab));
-                egui::Frame::NONE.fill(t.tab_strip).inner_margin(egui::Margin::symmetric(8, 4)).show(ui, |ui| {
-                    ui.set_width(ui.available_width());
-                    ui.horizontal(|ui| {
-                        // Not selectable text, so a press on the name drags the title bar.
-                        ui.add(egui::Label::new(egui::RichText::new(tl!(label)).color(t.text)).selectable(false).sense(egui::Sense::hover()));
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if crate::icons::button(ui, "x", 20.0, false, tl!("Close")).clicked() {
-                                request = Some("close");
-                            }
-                            let menu = crate::icons::button(ui, "ellipsis", 20.0, false, tl!("Panel menu"));
-                            egui::Popup::menu(&menu).show(|ui| {
-                                ui.set_min_width(200.0);
-                                panel_menu(app, ui, &panel);
-                                for (text, wanted) in [(tl!("Float Panel"), "float"), (tl!("Dock Panel"), "dock")] {
-                                    if ui.add_enabled(!locked, egui::Button::new(text)).clicked() {
-                                        request = Some(wanted);
-                                        ui.close();
-                                    }
+    let shown =
+        egui::Area::new(egui::Id::new("photocraft-rail-flyout")).order(egui::Order::Middle).fixed_pos(egui::pos2(left, top)).constrain(true).show(ctx, |ui| {
+            egui::Frame::NONE.fill(t.card).stroke(egui::Stroke::new(1.0, t.card_border)).corner_radius(t.radius_sm).shadow(ui.visuals().popup_shadow).show(
+                ui,
+                |ui| {
+                    ui.set_width(size.x);
+                    ui.set_height(size.y);
+                    // The title bar tears the panel off the bar into a floating window. Its buttons,
+                    // drawn after, keep their clicks.
+                    let bar = egui::Rect::from_min_size(ui.cursor().min, egui::vec2(size.x, 28.0));
+                    grip = Some(ui.interact(bar, egui::Id::new("photocraft-rail-flyout-grip"), egui::Sense::drag()).on_hover_cursor(egui::CursorIcon::Grab));
+                    egui::Frame::NONE.fill(t.tab_strip).inner_margin(egui::Margin::symmetric(8, 4)).show(ui, |ui| {
+                        ui.set_width(ui.available_width());
+                        ui.horizontal(|ui| {
+                            // Not selectable text, so a press on the name drags the title bar.
+                            ui.add(egui::Label::new(egui::RichText::new(tl!(label)).color(t.text)).selectable(false).sense(egui::Sense::hover()));
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                if crate::icons::button(ui, "x", 20.0, false, tl!("Close")).clicked() {
+                                    request = Some("close");
                                 }
+                                let menu = crate::icons::button(ui, "ellipsis", 20.0, false, tl!("Panel menu"));
+                                egui::Popup::menu(&menu).show(|ui| {
+                                    ui.set_min_width(200.0);
+                                    panel_menu(app, ui, &panel);
+                                    for (text, wanted) in [(tl!("Float Panel"), "float"), (tl!("Dock Panel"), "dock")] {
+                                        if ui.add_enabled(!locked, egui::Button::new(text)).clicked() {
+                                            request = Some(wanted);
+                                            ui.close();
+                                        }
+                                    }
+                                });
                             });
                         });
                     });
-                });
-                egui::Frame::NONE.inner_margin(egui::Margin::same(8)).show(ui, |ui| {
-                    ui.set_min_size(ui.available_size());
-                    body(app, ui, &panel);
-                });
-            });
+                    egui::Frame::NONE.inner_margin(egui::Margin::same(8)).show(ui, |ui| {
+                        ui.set_min_size(ui.available_size());
+                        body(app, ui, &panel);
+                    });
+                },
+            );
         });
     if let Some(grip) = grip.filter(|_| !locked)
         && (grip.dragged() || grip.drag_stopped())
@@ -635,6 +647,30 @@ pub(crate) fn rail_flyout(app: &mut PhotocraftApp, ctx: &egui::Context, rail: eg
         None if clicked_away => app.ui.rail_open = None,
         None => {}
     }
+}
+
+/// The largest side a separate panel window may have, in points: a window the GPU surface can
+/// always back, whatever a command or a saved layout asks for.
+const MAX_WINDOW_SIZE: f32 = 8192.0;
+
+/// A window side the OS and GPU surface accept: at least `min`, at most [`MAX_WINDOW_SIZE`], and
+/// `min` for a non-finite size (`clamp` would pass a NaN through).
+fn fit_side(side: f32, min: f32) -> f32 {
+    if side.is_finite() { side.clamp(min, MAX_WINDOW_SIZE) } else { min }
+}
+
+/// Separate windows read from a saved layout, which may be stale or hand-edited: entries for
+/// unknown panels are dropped, and a geometry that isn't a usable window (non-finite, far off,
+/// or too small or large to show) is forgotten, so the window opens over the app window instead.
+pub(crate) fn sanitize_windows(windows: std::collections::BTreeMap<String, Option<[f32; 4]>>) -> std::collections::BTreeMap<String, Option<[f32; 4]>> {
+    let usable = |[x, y, w, h]: [f32; 4]| {
+        [x, y, w, h].iter().all(|v| v.is_finite())
+            && x.abs() <= 1_000_000.0
+            && y.abs() <= 1_000_000.0
+            && (1.0..=MAX_WINDOW_SIZE).contains(&w)
+            && (1.0..=MAX_WINDOW_SIZE).contains(&h)
+    };
+    windows.into_iter().filter(|(id, _)| normalize(id) == Some(id.as_str())).map(|(id, rect)| (id, rect.filter(|r| usable(*r)))).take(PANELS.len()).collect()
 }
 
 /// Floating groups shown as OS windows, by the panel their entry is under. An entry whose panel
@@ -686,8 +722,8 @@ fn show_window(app: &mut PhotocraftApp, ctx: &egui::Context, key: &str, reveal: 
     let title = group.panels.iter().map(|p| label(p)).collect::<Vec<_>>().join(" · ");
     let builder = egui::ViewportBuilder::default()
         .with_title(format!("{title} — PhotoCraft"))
-        .with_position([x, y])
-        .with_inner_size([width.max(220.0), height.max(120.0)])
+        .with_position(if x.is_finite() && y.is_finite() { [x, y] } else { [origin.x, origin.y] })
+        .with_inner_size([fit_side(width, 220.0), fit_side(height, 120.0)])
         .with_min_inner_size([220.0, 120.0]);
     let viewport = egui::ViewportId::from_hash_of(("photocraft-panel-window", key));
     if reveal.is_some_and(|p| group.panels.contains(p)) {
@@ -719,14 +755,12 @@ fn show_window(app: &mut PhotocraftApp, ctx: &egui::Context, key: &str, reveal: 
                         egui::Popup::menu(&menu).show(|ui| {
                             ui.set_min_width(200.0);
                             panel_menu(app, ui, &active);
-                            for (label, wanted) in
-                                [
-                                    (tl!("Return to PhotoCraft Window"), WindowRequest::Attach),
-                                    (tl!("Dock Panel Group"), WindowRequest::Dock),
-                                    (tl!("Dock to Icon Bar"), WindowRequest::Rail),
-                                    (tl!("Close Tab Group"), WindowRequest::Close),
-                                ]
-                            {
+                            for (label, wanted) in [
+                                (tl!("Return to PhotoCraft Window"), WindowRequest::Attach),
+                                (tl!("Dock Panel Group"), WindowRequest::Dock),
+                                (tl!("Dock to Icon Bar"), WindowRequest::Rail),
+                                (tl!("Close Tab Group"), WindowRequest::Close),
+                            ] {
                                 if ui.add_enabled(!locked, egui::Button::new(label)).clicked() {
                                     request = Some(wanted);
                                     ui.close();
@@ -756,7 +790,9 @@ fn show_window(app: &mut PhotocraftApp, ctx: &egui::Context, key: &str, reveal: 
         Some(WindowRequest::Attach) => app.run("window.panel.attach", json!({"panel": key})),
         Some(WindowRequest::Close) => app.run("window.panel.group", json!({"panel": key, "operation": "close"})),
         Some(WindowRequest::Rail) => app.run("window.panel.toRail", json!({"panel": key, "group": true})),
-        Some(WindowRequest::Dock) => group.panels.iter().try_for_each(|panel| app.run("window.panel.dock", json!({"panel": panel})).map(|_| ())).map(|_| Value::Null),
+        Some(WindowRequest::Dock) => {
+            group.panels.iter().try_for_each(|panel| app.run("window.panel.dock", json!({"panel": panel})).map(|_| ())).map(|_| Value::Null)
+        }
     };
     // Gone from the screen: the next creation places it from the stored geometry again.
     ctx.data_mut(|d| d.remove::<[f32; 4]>(placed));
@@ -832,6 +868,28 @@ fn dock_width_range(columns: usize) -> std::ops::RangeInclusive<f32> {
 /// Where the first panel opened from the Window menu floats; later ones cascade from here.
 const FLOAT_ORIGIN: [f32; 4] = [400.0, 140.0, 300.0, 400.0];
 const FLOAT_CASCADE: f32 = 28.0;
+/// The gap between floating windows opened side by side.
+const FLOAT_GAP: f32 = 12.0;
+
+/// Where a newly opened floating panel goes: beside the floating windows already open, within
+/// `bounds` (the canvas area), so it never covers one of them. Only when there is no room does it
+/// cascade, and then onto a corner no other window starts at, so its title bar stays visible.
+fn open_slot(layout: &Layout<String>, bounds: egui::Rect) -> [f32; 4] {
+    let [x, y, w, h] = FLOAT_ORIGIN;
+    let taken: Vec<egui::Rect> =
+        layout.floating.iter().map(|g| egui::Rect::from_min_size(egui::pos2(g.rect[0], g.rect[1]), egui::vec2(g.rect[2], g.rect[3]))).collect();
+    let fits = |r: egui::Rect| bounds.contains_rect(r) && !taken.iter().any(|t| t.intersects(r));
+    // To the right of the origin first, then to its left.
+    let candidates = (0..8).map(|k| x + k as f32 * (w + FLOAT_GAP)).chain((1..8).map(|k| x - k as f32 * (w + FLOAT_GAP)));
+    for left in candidates {
+        let r = egui::Rect::from_min_size(egui::pos2(left, y), egui::vec2(w, h));
+        if fits(r) {
+            return [left, y, w, h];
+        }
+    }
+    let step = (0..8).map(|k| k as f32 * FLOAT_CASCADE).find(|step| !taken.iter().any(|t| t.min == egui::pos2(x + step, y + step))).unwrap_or(0.0);
+    [x + step, y + step, w, h]
+}
 
 /// Window › <panel> for a dock panel that isn't showing opens it as a floating window, ready to
 /// drag and resize (Window › Workspace › Open Panels Floating). A panel closed while floating
@@ -852,11 +910,7 @@ fn open_floating(app: &mut PhotocraftApp, id: &str, params: &Value) -> Option<Re
         return None;
     }
     let remembered = app.ui.docking.as_ref().and(app.ui.docking_hidden.get(panel)).and_then(|at| at.floating);
-    let [x, y, width, height] = remembered.unwrap_or_else(|| {
-        let step = (layout.floating.len() % 8) as f32 * FLOAT_CASCADE;
-        let [x, y, w, h] = FLOAT_ORIGIN;
-        [x + step, y + step, w, h]
-    });
+    let [x, y, width, height] = remembered.unwrap_or_else(|| open_slot(&layout, app.last_canvas_rect));
     let result = change(app, "float", &json!({"panel": panel, "x": x, "y": y, "width": width, "height": height}));
     if result.is_ok() {
         reveal_group(app, panel);

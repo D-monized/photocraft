@@ -839,9 +839,17 @@ pub fn apply(app: &mut PhotocraftApp, v: &Value) {
     app.ui.docking_reveal = None;
     app.ui.docking_generation = app.ui.docking_generation.wrapping_add(1);
     app.ui.docking_hidden = v.get("dockingHidden").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
-    app.ui.docking_windows = v.get("dockingWindows").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
-    app.ui.rail_panels = v.get("railPanels").and_then(|v| serde_json::from_value::<Vec<String>>(v.clone()).ok()).unwrap_or_default().into_iter().filter(|p| crate::panel_docking::normalize(p) == Some(p.as_str())).take(32).collect();
-    app.ui.rail_groups = v.get("railGroups").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
+    app.ui.docking_windows =
+        crate::panel_docking::sanitize_windows(v.get("dockingWindows").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default());
+    let mut rail_panels: Vec<String> = Vec::new();
+    for p in v.get("railPanels").and_then(|v| serde_json::from_value::<Vec<String>>(v.clone()).ok()).unwrap_or_default() {
+        if crate::panel_docking::normalize(&p) == Some(p.as_str()) && !rail_panels.contains(&p) && rail_panels.len() < 32 {
+            rail_panels.push(p);
+        }
+    }
+    app.ui.rail_panels = rail_panels;
+    app.ui.rail_groups =
+        v.get("railGroups").and_then(|v| serde_json::from_value::<Vec<Group>>(v.clone()).ok()).unwrap_or_default().into_iter().take(16).collect();
     app.ui.rail_open = None;
     app.ui.docking = v.get("docking").and_then(|d| serde_json::from_value(d.clone()).ok()).filter(crate::panel_docking::valid);
     if let Some(mut p) = v.get("panels").and_then(|p| serde_json::from_value::<Panels>(p.clone()).ok()) {

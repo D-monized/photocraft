@@ -803,13 +803,77 @@ fn a_panel_closed_while_floating_reopens_where_it_was_left() {
 }
 
 #[test]
-fn panels_opened_one_after_another_cascade_instead_of_stacking() {
+fn panels_opened_one_after_another_open_side_by_side_instead_of_stacking() {
     let mut app = app();
+    app.last_canvas_rect = egui::Rect::from_min_size(Pos2::ZERO, vec2(1400.0, 900.0));
     app.run("window.panel.navigator", json!({})).unwrap();
     app.run("window.panel.info", json!({})).unwrap();
     let (a, b) = (floating_rect(&app, "navigator").unwrap(), floating_rect(&app, "info").unwrap());
-    assert_ne!(a, b);
-    assert_eq!(b[0] - a[0], FLOAT_CASCADE);
+    assert_eq!(a, FLOAT_ORIGIN);
+    assert_eq!(b, [a[0] + a[2] + FLOAT_GAP, a[1], a[2], a[3]]);
+}
+
+#[test]
+fn a_panel_opened_beside_a_floating_one_leaves_it_visible() {
+    // The known issue: with Navigator floating, Window › Histogram opened a window 28 points
+    // off Navigator's, covering nearly all of it, so Navigator seemed to disappear.
+    let mut app = app();
+    app.last_canvas_rect = egui::Rect::from_min_size(Pos2::ZERO, vec2(1400.0, 900.0));
+    let mut h = harness(app, vec2(1400.0, 900.0));
+    let ctx = h.ctx.clone();
+    crate::menus::invoke(h.state_mut(), &ctx, "window.panel.navigator", json!({})).unwrap();
+    h.run_steps(4);
+    crate::menus::invoke(h.state_mut(), &ctx, "window.panel.histogram", json!({})).unwrap();
+    h.run_steps(4);
+    let [x, y, w, hh] = floating_rect(h.state(), "navigator").unwrap();
+    let area = egui::Id::new("photocraft-panel-docking");
+    let navigator = egui::LayerId::new(egui::Order::Middle, area.with(("floating", "navigator")));
+    assert_eq!(h.ctx.layer_id_at(egui::pos2(x + w / 2.0, y + hh / 2.0)), Some(navigator), "Navigator stays on top of its own spot");
+    let rect = |r: [f32; 4]| egui::Rect::from_min_size(egui::pos2(r[0], r[1]), vec2(r[2], r[3]));
+    assert!(!rect([x, y, w, hh]).intersects(rect(floating_rect(h.state(), "histogram").unwrap())));
+}
+
+#[test]
+fn with_no_room_beside_them_new_panels_cascade_onto_a_free_corner() {
+    let mut app = app();
+    // A canvas area that fits only one window: the rest cascade, each from its own corner.
+    app.last_canvas_rect = egui::Rect::from_min_size(egui::pos2(380.0, 0.0), vec2(340.0, 600.0));
+    for panel in ["navigator", "info", "histogram"] {
+        app.run(&format!("window.panel.{panel}"), json!({})).unwrap();
+    }
+    let corners: Vec<[f32; 2]> = ["navigator", "info", "histogram"].iter().map(|p| floating_rect(&app, p).unwrap()).map(|r| [r[0], r[1]]).collect();
+    assert_eq!(corners, [[400.0, 140.0], [428.0, 168.0], [456.0, 196.0]]);
+    // Closing the middle one frees its corner for the next panel.
+    app.run("window.panel.info", json!({})).unwrap();
+    app.run("window.panel.history", json!({})).unwrap();
+    assert_eq!(floating_rect(&app, "history").map(|r| [r[0], r[1]]), Some([428.0, 168.0]));
+}
+
+#[test]
+fn saved_separate_windows_with_unusable_geometry_are_forgotten_not_opened() {
+    let mut app = app();
+    let saved = json!({
+        "dockingWindows": {
+            "navigator": [10.0, 20.0, 300.0, 400.0],
+            "info": [0.0, 0.0, 1.0e30, 400.0],
+            "histogram": [-5.0e9, 0.0, 300.0, 400.0],
+            "layers": [0.0, 0.0, 0.0, 0.0],
+            "notAPanel": [0.0, 0.0, 300.0, 400.0],
+            "history": null
+        },
+        "railPanels": ["color", "color", "nope", "layers"]
+    });
+    crate::dock::apply(&mut app, &saved);
+    let windows = &app.ui.docking_windows;
+    assert_eq!(windows.get("navigator"), Some(&Some([10.0, 20.0, 300.0, 400.0])));
+    for panel in ["info", "histogram", "layers", "history"] {
+        assert_eq!(windows.get(panel), Some(&None), "{panel} opens over the app window instead");
+    }
+    assert!(!windows.contains_key("notAPanel"));
+    assert_eq!(app.ui.rail_panels, ["color", "layers"]);
+    // The command refuses a window the GPU surface couldn't back.
+    let err = app.run("window.panel.detach", json!({"panel": "navigator", "x": 0, "y": 0, "width": 100000, "height": 300})).unwrap_err();
+    assert!(err.contains("at most"), "{err}");
 }
 
 #[test]
@@ -907,7 +971,9 @@ fn a_window_menu_panel_floats_then_drags_into_a_new_dock_column_and_back_out() {
     h.run_steps(4);
     assert!(floating_rect(h.state(), "navigator").is_some());
     shot(&mut h, "2-navigator-floating");
-    let dock = |h: &Harness<'static, PhotocraftApp>| h.ctx.data_mut(|d| d.get_temp::<(usize, f32)>(egui::Id::new("photocraft-panel-docking").with("columns"))).unwrap();
+    let dock = |h: &Harness<'static, PhotocraftApp>| {
+        h.ctx.data_mut(|d| d.get_temp::<(usize, f32)>(egui::Id::new("photocraft-panel-docking").with("columns"))).unwrap()
+    };
     let (one, narrow) = dock(&h);
     assert_eq!(one, 1);
     // Drag its tab onto the left edge of the Layers group: a new column beside Layers.
@@ -1028,8 +1094,6 @@ fn a_separate_window_draws_its_panel_outside_the_in_app_layout() {
     assert!(h.query_by_label_contains("Navigator — PhotoCraft").is_none());
     assert!(h.state().ui.docking_windows.contains_key("navigator"));
 }
-
-
 
 #[test]
 fn dragging_a_divider_towards_collapsed_groups_expands_one_so_the_group_above_can_shrink() {
