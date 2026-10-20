@@ -36,7 +36,7 @@ fn alt_key(h: &mut Harness<'static, PhotocraftApp>, k: egui::Key) {
     h.run_steps(3);
 }
 
-/// A tap on Alt: down, then up with nothing else pressed between.
+/// A tap on Alt: down, then up with nothing else pressed between (it leaves the bar alone).
 fn alt_tap(h: &mut Harness<'static, PhotocraftApp>) {
     h.key_down(egui::Key::AltLeft);
     h.run_steps(2);
@@ -49,11 +49,11 @@ fn rows(h: &Harness<'static, PhotocraftApp>, level: usize) -> Vec<crate::menu_na
 }
 
 #[test]
-fn alt_focuses_the_bar_arrows_move_and_down_opens_the_lit_menu() {
+fn f10_focuses_the_bar_arrows_move_and_down_opens_the_lit_menu() {
     let mut h = bar();
     assert_eq!(Keys::current(&h.ctx).focus, None);
-    alt_tap(&mut h);
-    assert_eq!(Keys::current(&h.ctx).focus, Some(0), "Alt puts the keyboard on File");
+    key(&mut h, egui::Key::F10);
+    assert_eq!(Keys::current(&h.ctx).focus, Some(0), "F10 puts the keyboard on File");
     assert!(crate::menu_keys::is_focused(&h.ctx), "the shortcuts wait for the bar");
     assert!(!is_open(&h.ctx), "no menu opens yet");
     key(&mut h, egui::Key::ArrowRight);
@@ -76,46 +76,65 @@ fn alt_focuses_the_bar_arrows_move_and_down_opens_the_lit_menu() {
     assert!(!is_open(&h.ctx) && Keys::current(&h.ctx).focus.is_none(), "Esc leaves the menu and the bar");
 }
 
-/// Alt+wheel zooms; letting go of Alt after it is no tap, so Space (the hand tool) can't then
-/// open File and run New….
+/// Alt alone never takes the keyboard to the bar or underlines it: the tools use Alt (the
+/// eyedropper, Clone Stamp's source, a marquee from its centre), as in Photoshop. A tap, a long
+/// press with the key's repeats, Alt+click, Alt during a drag and Alt+wheel all leave the bar.
 #[test]
-fn alt_with_a_wheel_scroll_or_a_lost_focus_is_no_tap() {
+fn alt_alone_leaves_the_bar_alone() {
     let mut h = bar();
+    let alt = egui::Modifiers::ALT;
+    let no_bar = |h: &Harness<'static, PhotocraftApp>, what: &str| {
+        assert_eq!(Keys::current(&h.ctx).focus, None, "{what}: the bar keeps no focus");
+        assert!(!crate::menu_keys::is_focused(&h.ctx), "{what}: the shortcuts still run");
+        assert!(!is_open(&h.ctx), "{what}: no menu opens");
+    };
+    alt_tap(&mut h);
+    no_bar(&h, "a tap");
     h.key_down(egui::Key::AltLeft);
     h.run_steps(2);
-    h.event_modifiers(
-        egui::Event::MouseWheel {
-            unit: egui::MouseWheelUnit::Line,
-            delta: egui::vec2(0.0, -1.0),
-            phase: egui::TouchPhase::Move,
-            modifiers: egui::Modifiers::ALT,
-        },
-        egui::Modifiers::ALT,
-    );
+    assert!(!Nav::current(&h.ctx).underline, "holding Alt over the canvas underlines nothing");
+    for _ in 0..5 {
+        h.event_modifiers(egui::Event::Key { key: egui::Key::AltLeft, physical_key: None, pressed: true, repeat: true, modifiers: alt }, alt);
+        h.run_steps(1);
+    }
+    h.key_up(egui::Key::AltLeft);
+    h.run_steps(3);
+    no_bar(&h, "a long press");
+    let at = egui::pos2(600.0, 400.0);
+    let button = |h: &mut Harness<'static, PhotocraftApp>, pressed: bool, m: egui::Modifiers| {
+        h.event_modifiers(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: m }, m);
+        h.run_steps(2);
+    };
+    h.key_down(egui::Key::AltLeft);
+    h.run_steps(2);
+    button(&mut h, true, alt);
+    button(&mut h, false, alt);
+    h.key_up(egui::Key::AltLeft);
+    h.run_steps(3);
+    no_bar(&h, "Alt+click");
+    button(&mut h, true, egui::Modifiers::NONE);
+    alt_tap(&mut h);
+    button(&mut h, false, egui::Modifiers::NONE);
+    no_bar(&h, "Alt during a drag");
+    h.key_down(egui::Key::AltLeft);
+    h.run_steps(2);
+    h.event_modifiers(egui::Event::MouseWheel { unit: egui::MouseWheelUnit::Line, delta: egui::vec2(0.0, -1.0), phase: egui::TouchPhase::Move, modifiers: alt }, alt);
     h.run_steps(2);
     h.key_up(egui::Key::AltLeft);
     h.run_steps(3);
-    assert_eq!(Keys::current(&h.ctx).focus, None, "Alt+scroll leaves the bar alone");
     key(&mut h, egui::Key::Space);
-    assert!(!is_open(&h.ctx), "Space opens no menu");
-    h.key_down(egui::Key::AltLeft);
-    h.run_steps(2);
-    h.event(egui::Event::WindowFocused(false));
-    h.event(egui::Event::WindowFocused(true));
-    h.key_up(egui::Key::AltLeft);
-    h.run_steps(3);
-    assert_eq!(Keys::current(&h.ctx).focus, None, "Alt that went to the desktop leaves the bar alone");
+    no_bar(&h, "Alt+wheel, then Space");
 }
 
 #[test]
-fn a_second_alt_or_esc_or_a_click_takes_the_keyboard_off_the_bar() {
+fn a_second_f10_or_esc_or_a_click_takes_the_keyboard_off_the_bar() {
     let mut h = bar();
-    alt_tap(&mut h);
-    assert_eq!(Keys::current(&h.ctx).focus, Some(0));
-    alt_tap(&mut h);
-    assert_eq!(Keys::current(&h.ctx).focus, None, "a second tap leaves");
     key(&mut h, egui::Key::F10);
-    assert_eq!(Keys::current(&h.ctx).focus, Some(0), "F10 focuses the bar too");
+    assert_eq!(Keys::current(&h.ctx).focus, Some(0));
+    key(&mut h, egui::Key::F10);
+    assert_eq!(Keys::current(&h.ctx).focus, None, "a second F10 leaves");
+    key(&mut h, egui::Key::F10);
+    assert_eq!(Keys::current(&h.ctx).focus, Some(0), "F10 focuses the bar again");
     key(&mut h, egui::Key::Escape);
     assert_eq!(Keys::current(&h.ctx).focus, None);
     assert!(!crate::menu_keys::is_focused(&h.ctx));
@@ -186,11 +205,13 @@ fn mnemonics_are_underlined_only_with_alt_or_a_keyboard_opened_menu() {
     assert!(!Nav::current(&h.ctx).underline, "a menu opened with the mouse shows no underlines");
     h.key_down(egui::Key::AltLeft);
     h.run_steps(3);
-    assert!(Nav::current(&h.ctx).underline, "while Alt is held they show");
+    assert!(Nav::current(&h.ctx).underline, "while Alt is held in an open menu they show");
     h.key_up(egui::Key::AltLeft);
     h.run_steps(3);
-    // The tap closed the menu (as on Windows); opening from the keyboard underlines.
-    assert!(!is_open(&h.ctx), "an Alt tap closes an open menu");
+    assert!(is_open(&h.ctx), "letting go of Alt leaves the menu open");
+    assert!(!Nav::current(&h.ctx).underline, "and hides them again");
+    // Opening from the keyboard underlines.
+    key(&mut h, egui::Key::Escape);
     alt_key(&mut h, egui::Key::F);
     h.run_steps(2);
     assert!(is_open(&h.ctx) && Nav::current(&h.ctx).underline);

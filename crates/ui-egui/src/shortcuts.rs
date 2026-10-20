@@ -376,7 +376,7 @@ pub fn handle(app: &mut PhotocraftApp, ctx: &egui::Context) {
         return;
     }
     // An open menu owns the keyboard (arrows, ↩, Esc), like a native menu; so does the menu bar
-    // once Alt or F10 put the keyboard on it (#4988), and an open dropdown list, whose letters
+    // once F10 puts the keyboard on it (#4988), and an open dropdown list, whose letters
     // pick an option rather than a tool (#1481).
     if crate::menu_nav::is_open(ctx) || crate::menu_keys::is_focused(ctx) || crate::widgets::dropdown_list_open(ctx) {
         return;
