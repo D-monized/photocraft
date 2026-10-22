@@ -359,7 +359,7 @@ fn alt_up(h: &mut Harness<'static, PhotocraftApp>) {
 
 /// #7481: Alt held through a shortcut is no tap, even when the shortcut consumed its key before
 /// the bar saw it. Ctrl+Alt+I opens Image Size; releasing Alt leaves the keyboard where it was,
-/// so Enter confirms the dialog instead of opening File. A lone tap still puts it on the bar.
+/// so Enter confirms the dialog instead of opening File. A lone tap leaves the bar alone too.
 #[test]
 fn alt_held_through_a_shortcut_does_not_put_the_keyboard_on_the_bar() {
     let mut h = whole_app();
@@ -375,5 +375,5 @@ fn alt_held_through_a_shortcut_does_not_put_the_keyboard_on_the_bar() {
 
     alt_down(&mut h, egui::Modifiers::ALT);
     alt_up(&mut h);
-    assert_eq!(Keys::current(&h.ctx).focus, Some(0), "a lone tap still focuses the bar");
+    assert_eq!(Keys::current(&h.ctx).focus, None, "a lone tap leaves the bar alone");
 }
