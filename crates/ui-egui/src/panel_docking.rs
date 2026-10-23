@@ -859,9 +859,10 @@ fn column_count(node: Option<&Node<String>>) -> usize {
     node.map_or(0, |node| count(node, 0))
 }
 
-/// The dock's width range, widened so every column can keep a usable width.
-fn dock_width_range(columns: usize) -> std::ops::RangeInclusive<f32> {
-    let range = crate::panels::DOCK_WIDTH;
+/// The dock's width range in a window `window_width` wide (#7896), widened so every column can keep
+/// a usable width.
+fn dock_width_range(columns: usize, window_width: f32) -> std::ops::RangeInclusive<f32> {
+    let range = crate::panels::dock_width_range(window_width);
     *range.start()..=range.end().max(columns as f32 * (COLUMN_WIDTH + 70.0))
 }
 
@@ -1133,7 +1134,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> bool {
         && before != columns
     {
         let grown = width + (columns as f32 - before as f32) * COLUMN_WIDTH;
-        let range = dock_width_range(columns);
+        let range = dock_width_range(columns, ui.ctx().content_rect().width());
         requested_width = Some(grown.clamp(*range.start(), *range.end()));
     }
     let mut commands = Vec::new();
@@ -1188,7 +1189,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> bool {
     let output = if layout.root.is_some() {
         let mut panel = egui::Panel::right("shared-panel-dock")
             .default_size(if t.pro { 290.0 } else { 300.0 })
-            .size_range(dock_width_range(columns))
+            .size_range(dock_width_range(columns, ui.ctx().content_rect().width()))
             .resizable(!locked)
             .frame(egui::Frame::NONE.fill(t.card));
         if let Some(width) = requested_width {
@@ -1627,7 +1628,7 @@ fn panel_menu(app: &mut PhotocraftApp, ui: &mut egui::Ui, panel: &str) {
             crate::brush_panel::panel_menu(app, ui);
             ui.separator();
         }
-        "actions" => {
+        "actions" | "Actions" => {
             crate::actions::panel_menu(app, ui);
             ui.separator();
         }
