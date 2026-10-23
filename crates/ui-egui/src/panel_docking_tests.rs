@@ -1410,3 +1410,32 @@ fn the_dock_can_be_as_wide_as_the_window_allows() {
         assert_eq!((*range.start(), *range.end()), (crate::panels::DOCK_MIN_WIDTH, max), "{window}");
     }
 }
+
+#[test]
+fn rejected_panel_detach_preserves_dock_and_return_positions() {
+    for customized in [false, true] {
+        let mut app = app();
+        if customized {
+            app.run("window.panel.move", json!({"panel":"navigator", "anchor":"layers", "zone":"top"})).unwrap();
+        }
+        let before = serde_json::to_value(&app.ui).unwrap();
+        let result = app.run("window.panel.detach", json!({"panel":"navigator", "x":0, "y":0, "width":MAX_WINDOW_SIZE + 1.0, "height":300}));
+        assert!(result.is_err());
+        assert_eq!(serde_json::to_value(&app.ui).unwrap(), before, "a rejected detach must not float the panel");
+    }
+}
+
+#[test]
+fn rejected_panel_undock_preserves_the_open_rail_flyout() {
+    let mut app = app();
+    app.run("window.panel.toRail", json!({"panel":"navigator"})).unwrap();
+    app.run("window.panel.toRail", json!({"panel":"histogram"})).unwrap();
+    app.ui.rail_open = Some("navigator".into());
+    let before = serde_json::to_value(&app.ui).unwrap();
+    for params in [json!({"panel":"navigator", "to":"float", "width":-1}), json!({"panel":"navigator", "to":"float", "x":"invalid"})] {
+        assert!(app.run("window.panel.fromRail", params).is_err());
+        assert_eq!(app.ui.rail_open.as_deref(), Some("navigator"), "a failed move must not dismiss the flyout");
+        assert_eq!(serde_json::to_value(&app.ui).unwrap(), before);
+        assert_eq!(app.ui.rail_panels, ["navigator", "histogram"]);
+    }
+}
