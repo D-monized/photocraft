@@ -238,14 +238,14 @@ fn window_command(app: &mut PhotocraftApp, detach: bool, params: &Value) -> Resu
         }
         _ => return Err("give all of x, y, width and height, or none".into()),
     };
+    if rect.is_some_and(|r| r[2] > MAX_WINDOW_SIZE || r[3] > MAX_WINDOW_SIZE) {
+        return Err(format!("width and height must be at most {MAX_WINDOW_SIZE}"));
+    }
     if detach {
         let floating = app.ui.docking.as_ref().is_some_and(|layout| layout.floating.iter().any(|g| g.panels.iter().any(|p| p == panel)));
         if !floating {
             change(app, "float", &json!({"panel": panel}))?;
         }
-    }
-    if rect.is_some_and(|r| r[2] > MAX_WINDOW_SIZE || r[3] > MAX_WINDOW_SIZE) {
-        return Err(format!("width and height must be at most {MAX_WINDOW_SIZE}"));
     }
     let members = app.ui.docking.as_ref().map(|layout| group_members(layout, panel)).filter(|m| !m.is_empty()).unwrap_or_else(|| vec![panel.to_owned()]);
     // One entry per window, under the panel it was opened by.
@@ -292,6 +292,7 @@ fn rail_command(app: &mut PhotocraftApp, to_rail: bool, params: &Value) -> Resul
         Some(value) => value.as_str().filter(|to| ["float", "dock", "none"].contains(to)).ok_or("to must be float, dock or none")?,
     };
     let Some(index) = app.ui.rail_panels.iter().position(|id| id == panel) else { return Err("panel is not on the icon bar".into()) };
+    let previous_open = app.ui.rail_open.clone();
     app.ui.rail_panels.remove(index);
     if app.ui.rail_open.as_deref() == Some(panel) {
         app.ui.rail_open = None;
@@ -313,6 +314,7 @@ fn rail_command(app: &mut PhotocraftApp, to_rail: bool, params: &Value) -> Resul
     if let Err(error) = result {
         // Nothing moved: it stays on the bar.
         app.ui.rail_panels.insert(index.min(app.ui.rail_panels.len()), panel.to_owned());
+        app.ui.rail_open = previous_open;
         return Err(error);
     }
     Ok(json!({"rail": app.ui.rail_panels}))
