@@ -669,7 +669,9 @@ mod tests {
         let motion = items.iter().position(|i| i.id == "window.workspace.motion").unwrap();
         let saved: Vec<(&str, Option<bool>, bool)> = items[motion + 1..].iter().take(2).map(|i| (i.label.as_str(), i.checked, i.enabled)).collect();
         assert_eq!(saved, [("Comp", Some(true), true), ("Retouch", Some(false), true)]);
-        assert!(items.iter().filter(|i| !i.id.starts_with(SAVED)).all(|i| i.checked != Some(true) || i.id == "window.workspace.lockWorkspace"));
+        // Besides the current saved workspace, only the menu's two settings can be checked.
+        let settings = ["window.workspace.lockWorkspace", "window.workspace.openPanelsFloating"];
+        assert!(items.iter().filter(|i| !i.id.starts_with(SAVED)).all(|i| i.checked != Some(true) || settings.contains(&i.id.as_str())));
         assert!(crate::menus::is_live(&format!("{SAVED}1")));
         // Switch to a preset, then back through the menu item.
         crate::menus::invoke(&mut app, &ctx, "window.workspace.painting", json!({})).unwrap();
